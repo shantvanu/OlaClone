@@ -18,25 +18,26 @@ const Layout: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-primary text-text-main">
             <nav className="bg-secondary border-b border-gray-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-                <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-accent tracking-tighter">
+                <div
+                    onClick={() => {
+                        if (!user) {
+                            navigate('/login');
+                        } else if (user.role === 'driver') {
+                            navigate('/driver');
+                        } else {
+                            navigate('/');
+                        }
+                    }}
+                    className="flex items-center gap-2 text-2xl font-bold text-accent tracking-tighter cursor-pointer"
+                >
                     <Car size={28} />
                     <span>OlaClone</span>
-                </Link>
+                </div>
 
                 <div className="flex items-center gap-6">
                     {user ? (
                         <>
-                            {/* Show "Book a Ride" only to regular users (not drivers) */}
-                            {user.role !== 'driver' && (
-                                <Link to="/booking" className="hover:text-accent transition-colors">Book a Ride</Link>
-                            )}
-
-                            {/* Show "Driver Dashboard" only to drivers */}
-                            {user.role === 'driver' && (
-                                <Link to="/driver" className="hover:text-accent transition-colors">Driver Dashboard</Link>
-                            )}
-
-                            <div className="flex items-center gap-4 ml-4">
+                            <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2 text-sm text-text-muted">
                                     <UserIcon size={16} />
                                     <span>{user.name}</span>

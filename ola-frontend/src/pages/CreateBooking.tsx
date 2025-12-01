@@ -48,6 +48,14 @@ const CreateBooking: React.FC = () => {
         { type: 'bike', label: 'Bike', icon: Bike, price: 80, time: '8 mins', description: 'Fastest option' },
     ];
 
+    // Redirect to home if no location data
+    useEffect(() => {
+        if (!pickup || !destinationQuery) {
+            console.log('[CREATE_BOOKING] No location data, redirecting to home');
+            navigate('/');
+        }
+    }, [pickup, destinationQuery, navigate]);
+
     useEffect(() => {
         const fetchDropCoords = async () => {
             if (destinationQuery) {
