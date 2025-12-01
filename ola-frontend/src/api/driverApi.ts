@@ -27,3 +27,7 @@ export const updateLocation = (driverId: string, coords: { lat: number, lng: num
 export const getDriverCurrentBooking = (driverId: string) => {
   return axiosClient.get("/driver/current-booking", { params: { driverId } });
 };
+
+export const getDriverStats = (driverId: string) => {
+  return axiosClient.get("/driver/stats", { params: { driverId } });
+};

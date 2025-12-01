@@ -23,4 +23,7 @@ router.get("/:bookingId", getBookingById);
 // ---------- CREATE BOOKING ----------
 router.post("/create", createBooking);
 
+// ---------- Convenience alias for frontend (`/booking/:bookingId/cancel`) ----------
+router.patch("/:bookingId/cancel", cancelBooking);
+
 export default router;

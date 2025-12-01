@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import CreateBooking from './pages/CreateBooking';
 import DriverDashboard from './pages/DriverDashboard';
 import PaymentPage from './pages/PaymentPage';
+import BookingStatus from './pages/BookingStatus';
 import { useSelector } from 'react-redux';
 import type { RootState } from './redux/store';
 
@@ -37,6 +38,12 @@ function App() {
           <Route path="driver" element={
             <ProtectedRoute>
               <DriverDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="bookings" element={
+            <ProtectedRoute>
+              <BookingStatus />
             </ProtectedRoute>
           } />
 

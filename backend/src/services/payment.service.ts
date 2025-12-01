@@ -8,13 +8,13 @@ import { log } from "../utils/logger";
 export const paymentService = {
   async createPaymentIntent({ amount }: { amount: number }) {
     // simulate provider response
-    const clientSecret = "mock_client_secret_" + Date.now();
-    log("Mock payment intent created for", amount, clientSecret);
-    return { clientSecret, amount };
+    const providerId = "mock_provider_" + Date.now();
+    log("Mock payment intent created for", amount, providerId);
+    return { providerId, amount };
   },
 
   async verifyPayment({ providerId }: { providerId: string }) {
-    // In dev, we accept any providerId
+    // In dev, we accept any providerId as successful
     log("Mock payment verified", providerId);
     return { status: "paid", providerId };
   }

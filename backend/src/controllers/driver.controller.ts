@@ -152,10 +152,13 @@ export const completeRide = async (req: Request, res: Response) => {
   booking.logs.push({ ts: new Date(), text: "Driver completed the ride" });
   await booking.save();
 
-  // free driver
+  // update driver stats & free driver
+  const fareTotal = (booking.fareBreakdown as any)?.total || 0;
   driver.status = "available";
   driver.assignedBookingId = null;
   driver.lastAssignedAt = null;
+  driver.totalEarnings = (driver.totalEarnings || 0) + fareTotal;
+  driver.totalRides = (driver.totalRides || 0) + 1;
   await driver.save();
 
   return res.json({ ok: true, booking, driver });
@@ -167,4 +170,21 @@ export const getDriverCurrentBooking = async (req: Request, res: Response) => {
   if (!driverId) return res.status(400).json({ msg: "driverId required" });
   const booking = await Booking.findOne({ driverId: new mongoose.Types.ObjectId(String(driverId)), status: { $in: ["assigned","accepted","running"] } }).sort({ createdAt: -1 });
   return res.json({ ok: true, booking });
+};
+
+/** Driver stats for dashboard (total rides & earnings) */
+export const getDriverStats = async (req: Request, res: Response) => {
+  const { driverId } = req.query;
+  if (!driverId) return res.status(400).json({ msg: "driverId required" });
+
+  const driver = await Driver.findById(driverId);
+  if (!driver) return res.status(404).json({ msg: "Driver not found" });
+
+  return res.json({
+    ok: true,
+    stats: {
+      totalEarnings: driver.totalEarnings || 0,
+      totalRides: driver.totalRides || 0
+    }
+  });
 };

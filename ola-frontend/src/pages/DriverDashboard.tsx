@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../redux/store';
-import { getNearbyRequests, acceptAssignment, startRide, completeRide, updateLocation, getDriverCurrentBooking } from '../api/driverApi';
+import { getNearbyRequests, acceptAssignment, startRide, completeRide, updateLocation, getDriverCurrentBooking, getDriverStats } from '../api/driverApi';
 import { MapPin, Navigation, User } from 'lucide-react';
 
 const DriverDashboard: React.FC = () => {
@@ -20,6 +20,21 @@ const DriverDashboard: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
     const [error, setError] = useState('');
+    const [stats, setStats] = useState<{ totalEarnings: number; totalRides: number } | null>(null);
+
+    // Fetch driver stats once when online & driverId available
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!driverId) return;
+            try {
+                const res = await getDriverStats(driverId);
+                setStats(res.data.stats);
+            } catch (err) {
+                console.error('[DRIVER_DASHBOARD] Failed to load stats', err);
+            }
+        };
+        fetchStats();
+    }, [driverId]);
 
     // Poll for nearby requests or current booking
     useEffect(() => {
@@ -240,7 +255,7 @@ const DriverDashboard: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto p-6">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Driver Dashboard</h1>
                     <p className="text-gray-400 text-sm mt-1">Driver ID: {driverId}</p>
@@ -253,6 +268,20 @@ const DriverDashboard: React.FC = () => {
                     {isOnline ? '🟢 You are Online' : '⚪ Go Online'}
                 </button>
             </div>
+
+            {/* Stats summary */}
+            {stats && (
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="bg-secondary p-4 rounded-xl border border-gray-700">
+                        <div className="text-gray-400 text-xs uppercase mb-1">Total Rides</div>
+                        <div className="text-2xl font-bold text-white">{stats.totalRides}</div>
+                    </div>
+                    <div className="bg-secondary p-4 rounded-xl border border-gray-700">
+                        <div className="text-gray-400 text-xs uppercase mb-1">Total Earnings</div>
+                        <div className="text-2xl font-bold text-accent">₹{stats.totalEarnings.toFixed(0)}</div>
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg mb-4">

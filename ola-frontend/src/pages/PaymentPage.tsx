@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CreditCard, Smartphone, Wallet, DollarSign } from 'lucide-react';
+import { paymentApi } from '../api/paymentApi';
 
 const PaymentPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { bookingId, amount } = location.state || { bookingId: null, amount: 250 };
+    const { bookingId, amount: initialAmount } = location.state || { bookingId: null, amount: 250 };
 
     console.log('[PAYMENT] Component mounted');
     console.log('[PAYMENT] Booking ID:', bookingId);
@@ -18,6 +19,28 @@ const PaymentPage: React.FC = () => {
     const [cardCVV, setCardCVV] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [amount, setAmount] = useState<number>(initialAmount);
+    const [providerId, setProviderId] = useState<string | null>(null);
+
+    // On mount, if we have a bookingId, create a mock payment intent
+    useEffect(() => {
+        const initIntent = async () => {
+            if (!bookingId) return;
+            try {
+                const res = await paymentApi.createIntent({ bookingId });
+                console.log('[PAYMENT] create-intent response:', res.data);
+                if (res.data.ok) {
+                    setProviderId(res.data.providerId);
+                    if (res.data.amount) {
+                        setAmount(res.data.amount);
+                    }
+                }
+            } catch (err) {
+                console.error('[PAYMENT] Failed to create payment intent', err);
+            }
+        };
+        initIntent();
+    }, [bookingId]);
 
     const paymentMethods = [
         {
@@ -107,13 +130,15 @@ const PaymentPage: React.FC = () => {
 
             console.log('[PAYMENT] Processing payment...');
 
-            // Simulate payment processing
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // For all methods, hit mock verify endpoint so backend marks booking as paid
+            if (bookingId && providerId) {
+                await paymentApi.verify({ providerId, bookingId });
+            }
 
             console.log('[PAYMENT] Payment processed successfully');
 
             if (selectedMethod === 'cash') {
-                alert(`✅ Payment Method Selected: Cash\n\nYou will pay ₹${amount} in cash to the driver after the ride.`);
+                alert(`✅ Payment Method Selected: Cash\n\nYou will pay ₹${amount} in cash to the driver after the ride.\n(Booking marked as paid in system)`);
             } else {
                 alert(`✅ Payment Successful!\n\nAmount: ₹${amount}\nMethod: ${selectedMethod.toUpperCase()}\nBooking ID: ${bookingId || 'N/A'}\n\nThank you for your payment!`);
             }

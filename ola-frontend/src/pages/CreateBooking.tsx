@@ -111,13 +111,20 @@ const CreateBooking: React.FC = () => {
             console.log('[CREATE_BOOKING] Booking response:', response.data);
 
             if (response.data.ok) {
-                const bookingId = response.data.booking._id;
-                console.log('[CREATE_BOOKING] Booking created successfully! ID:', bookingId);
+                const booking = response.data.booking;
+                const bookingId = booking._id;
+                const amount = booking.fareBreakdown?.total || rideOptions.find(r => r.type === selectedRide)?.price || 0;
+                console.log('[CREATE_BOOKING] Booking created successfully! ID:', bookingId, 'Amount:', amount);
 
-                alert(`✅ Booking Confirmed!\n\nBooking ID: ${bookingId}\nRide Type: ${selectedRide}\nEstimated Fare: ₹${rideOptions.find(r => r.type === selectedRide)?.price}\n\nSearching for nearby driver...`);
+                alert(`✅ Booking Confirmed!\n\nBooking ID: ${bookingId}\nRide Type: ${selectedRide}\nEstimated Fare: ₹${amount}\n\nProceeding to payment...`);
 
-                // Navigate to home or booking status page
-                navigate('/');
+                // Navigate to payment page with bookingId & amount
+                navigate('/payment', {
+                    state: {
+                        bookingId,
+                        amount
+                    }
+                });
             } else {
                 throw new Error('Booking creation failed - no success flag');
             }

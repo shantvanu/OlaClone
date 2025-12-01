@@ -4,8 +4,8 @@ import { createPaymentIntent, verifyPayment } from "../controllers/payment.contr
 
 const router = Router();
 
-router.post("/init", createPaymentIntent);
+// Matches frontend and README spec: /payment/create-intent
+router.post("/create-intent", createPaymentIntent);
 router.post("/verify", verifyPayment);
-
 
 export default router;

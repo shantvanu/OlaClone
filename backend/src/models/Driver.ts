@@ -4,7 +4,7 @@ const driverSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
-    vehicleType: { type: String, required: true }, // auto | mini | bike | sedan etc.
+    vehicleType: { type: String, required: true }, // bike | auto | car | mini | sedan etc.
 
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,7 +14,7 @@ const driverSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["available", "assigned", "accepted", "busy"],
+      enum: ["available", "assigned", "accepted", "busy", "offline"],
       default: "available"
     },
 
@@ -39,6 +39,15 @@ const driverSchema = new mongoose.Schema(
         type: [Number],
         default: [0, 0]
       }
+    },
+    // Aggregated stats for dashboard
+    totalEarnings: {
+      type: Number,
+      default: 0
+    },
+    totalRides: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }

@@ -10,7 +10,8 @@ import {
   declineAssignment,
   startRide,
   completeRide,
-  getDriverCurrentBooking
+  getDriverCurrentBooking,
+  getDriverStats
 } from "../controllers/driver.controller";
 
 import { authMiddleware } from "../middleware/auth.middleware";
@@ -40,5 +41,8 @@ router.post("/complete", authMiddleware, completeRide);
 
 // Driver’s active booking
 router.get("/current-booking", authMiddleware, getDriverCurrentBooking);
+
+// Driver stats (earnings, total rides)
+router.get("/stats", authMiddleware, getDriverStats);
 
 export default router;

@@ -163,13 +163,22 @@ export const completeBooking = async (req: Request, res: Response) => {
     await booking.save();
 
     if (booking.driverId) {
-      await Driver.findByIdAndUpdate(booking.driverId, {
-        $set: {
-          status: "available",
-          assignedBookingId: null,
-          lastAssignedAt: null,
-        },
-      });
+      const fareTotal = (booking.fareBreakdown as any)?.total || 0;
+
+      await Driver.findByIdAndUpdate(
+        booking.driverId,
+        {
+          $set: {
+            status: "available",
+            assignedBookingId: null,
+            lastAssignedAt: null,
+          },
+          $inc: {
+            totalEarnings: fareTotal,
+            totalRides: 1
+          }
+        }
+      );
     }
 
     return res.json({ ok: true, booking });
