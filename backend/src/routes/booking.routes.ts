@@ -1,29 +1,25 @@
 // src/routes/booking.routes.ts
 import { Router } from "express";
 import {
+  getRideOptions,
   createBooking,
   getBookingById,
-  getBookingHistory,
-  updateDestination,
-  completeBooking,
-  cancelBooking
+  getBookingHistory
 } from "../controllers/booking.controller";
 
 const router = Router();
 
-// ---------- SPECIFIC ROUTES FIRST ----------
-router.patch("/update-destination/:bookingId", updateDestination);
-router.patch("/complete/:bookingId", completeBooking);
-router.patch("/cancel/:bookingId", cancelBooking);
+// Get ride options (BIKE, AUTO, CAR with fare and time)
+router.get("/options", getRideOptions);
 
-// ---------- GENERAL ROUTES ----------
-router.get("/", getBookingHistory);
+// Create a booking
+router.post("/book", createBooking);
+
+// Get booking by ID
 router.get("/:bookingId", getBookingById);
 
-// ---------- CREATE BOOKING ----------
-router.post("/create", createBooking);
-
-// ---------- Convenience alias for frontend (`/booking/:bookingId/cancel`) ----------
-router.patch("/:bookingId/cancel", cancelBooking);
+// Get user's booking history
+router.get("/", getBookingHistory);
 
 export default router;
+

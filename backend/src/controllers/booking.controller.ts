@@ -2,216 +2,160 @@
 import { Request, Response } from "express";
 import Booking from "../models/Booking";
 import Driver from "../models/Driver";
-import { fareService } from "../services/fare.service";
-import { assignmentService } from "../services/assignment.service";
-import mongoose from "mongoose";
 import { haversineDistanceKm } from "../utils/geo";
+import { calculateFareAndTime } from "../utils/vehicles";
+import mongoose from "mongoose";
 import { log } from "../utils/logger";
 
-/** Create booking */
+/**
+ * GET /api/ride/options?distance=X
+ * Returns ride options (BIKE, AUTO, CAR) with fare and time
+ */
+export const getRideOptions = async (req: Request, res: Response) => {
+  try {
+    const { distance } = req.query;
+    if (!distance) {
+      return res.status(400).json({ msg: "distance query parameter required" });
+    }
+
+    const distanceKm = parseFloat(distance as string);
+    if (isNaN(distanceKm) || distanceKm <= 0) {
+      return res.status(400).json({ msg: "distance must be a positive number" });
+    }
+
+    const options = [
+      {
+        vehicleType: "BIKE",
+        ...calculateFareAndTime("BIKE", distanceKm)
+      },
+      {
+        vehicleType: "AUTO",
+        ...calculateFareAndTime("AUTO", distanceKm)
+      },
+      {
+        vehicleType: "CAR",
+        ...calculateFareAndTime("CAR", distanceKm)
+      }
+    ];
+
+    return res.json({ ok: true, options });
+  } catch (err) {
+    log("getRideOptions error", err);
+    return res.status(500).json({ msg: "Server error" });
+  }
+};
+
+/**
+ * POST /api/ride/book
+ * Creates a booking
+ */
 export const createBooking = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId; // ✅ coming from JWT
+    const userId = (req as any).userId;
+    const {
+      pickupLocation,
+      dropLocation,
+      distanceKm,
+      vehicleType,
+      fare,
+      estimatedTimeMin
+    } = req.body;
 
-    const { pickup, drop, rideType, scheduleFor, paymentMethod } = req.body;
-    if (!pickup || !drop || !rideType)
-      return res.status(400).json({ msg: "Missing required fields" });
-
-    if (!pickup.coords || !drop.coords)
-      return res.status(400).json({ msg: "pickup.coords and drop.coords required" });
-
-    if (typeof pickup.coords.lat !== "number" || typeof pickup.coords.lng !== "number")
-      return res.status(400).json({ msg: "Invalid pickup coords" });
-
-    // Distance & time calculations
-    const distKm = haversineDistanceKm(
-      pickup.coords.lat,
-      pickup.coords.lng,
-      drop.coords.lat,
-      drop.coords.lng
-    );
-
-    const durationMin = Math.max(1, Math.round((distKm / 30) * 60));
-    const fareBreakdown = fareService.calculateFare(distKm, durationMin, rideType);
-
-    // Save booking
-    const booking = await Booking.create({
-      userId: new mongoose.Types.ObjectId(userId),
-      pickup,
-      drop,
-      distanceKm: Number(distKm.toFixed(2)),
-      durationText: `${durationMin} mins`,
-      rideType,
-      fareBreakdown,
-      payment: { method: paymentMethod || "cash", status: "pending" },
-      status: scheduleFor ? "scheduled" : "pending_assignment",
-      scheduledFor: scheduleFor ? new Date(scheduleFor) : null,
-      logs: [
-        {
-          ts: new Date(),
-          text: scheduleFor
-            ? "Scheduled booking created"
-            : "Booking created - pending assignment",
-        },
-      ],
-    });
-
-    // If not scheduled → try assigning driver immediately
-    if (!scheduleFor) {
-      const assignedDriver = await assignmentService.tryAssignDriver(
-        booking._id,
-        pickup.coords,
-        rideType
-      );
-
-      return res.json({
-        ok: true,
-        booking,
-        assignedDriver: assignedDriver || null,
+    // Validate required fields
+    if (
+      !pickupLocation ||
+      !dropLocation ||
+      typeof distanceKm !== "number" ||
+      !vehicleType ||
+      typeof fare !== "number" ||
+      typeof estimatedTimeMin !== "number"
+    ) {
+      return res.status(400).json({
+        msg: "Missing or invalid required fields: pickupLocation, dropLocation, distanceKm, vehicleType, fare, estimatedTimeMin"
       });
     }
 
-    return res.json({ ok: true, booking, msg: "Scheduled booking saved" });
+    // Validate vehicle type
+    if (!["BIKE", "AUTO", "CAR"].includes(vehicleType)) {
+      return res.status(400).json({ msg: "Invalid vehicleType. Must be BIKE, AUTO, or CAR" });
+    }
+
+    // Create booking
+    const booking = await Booking.create({
+      userId: new mongoose.Types.ObjectId(userId),
+      pickupLocation,
+      dropLocation,
+      distanceKm,
+      vehicleType,
+      fare,
+      estimatedTimeMin,
+      status: "PENDING"
+    });
+
+    log(`Booking created: ${booking._id} for user ${userId}`);
+
+    return res.json({
+      ok: true,
+      booking: {
+        bookingId: booking._id,
+        status: booking.status,
+        fare: booking.fare,
+        estimatedTimeMin: booking.estimatedTimeMin
+      }
+    });
   } catch (err) {
     log("createBooking error", err);
     return res.status(500).json({ msg: "Server error" });
   }
 };
 
+/**
+ * GET /api/ride/:bookingId
+ * Get booking details
+ */
 export const getBookingById = async (req: Request, res: Response) => {
-  const { bookingId } = req.params;
-  if (!bookingId) return res.status(400).json({ msg: "bookingId required" });
+  try {
+    const { bookingId } = req.params;
+    if (!bookingId) {
+      return res.status(400).json({ msg: "bookingId required" });
+    }
 
-  const booking = await Booking.findById(bookingId).populate("driverId userId");
-  if (!booking) return res.status(404).json({ msg: "Booking not found" });
+    const booking = await Booking.findById(bookingId)
+      .populate("userId", "name email")
+      .populate("driverId", "name email vehicleType");
 
-  return res.json({ ok: true, booking });
+    if (!booking) {
+      return res.status(404).json({ msg: "Booking not found" });
+    }
+
+    return res.json({ ok: true, booking });
+  } catch (err) {
+    log("getBookingById error", err);
+    return res.status(500).json({ msg: "Server error" });
+  }
 };
 
-// ⭐ Updated getHistory → userId comes from token
+/**
+ * GET /api/ride/history
+ * Get user's booking history
+ */
 export const getBookingHistory = async (req: Request, res: Response) => {
-  const userId = (req as any).userId;
-  if (!userId) return res.status(400).json({ msg: "Missing userId" });
-
-  const list = await Booking.find({
-    userId: new mongoose.Types.ObjectId(userId),
-  })
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .lean();
-
-  return res.json({ ok: true, bookings: list });
-};
-
-export const updateDestination = async (req: Request, res: Response) => {
   try {
-    const { bookingId } = req.params;
-    const { newDrop, distanceKm, durationText } = req.body;
-
-    if (!bookingId || !newDrop)
-      return res.status(400).json({ msg: "bookingId and newDrop required" });
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ msg: "Booking not found" });
-
-    if (!["running", "assigned", "accepted"].includes(booking.status))
-      return res
-        .status(400)
-        .json({ msg: "Cannot update destination for this booking status" });
-
-    const distKm =
-      distanceKm ??
-      haversineDistanceKm(
-        booking.pickup.coords.lat,
-        booking.pickup.coords.lng,
-        newDrop.coords.lat,
-        newDrop.coords.lng
-      );
-
-    const durationMin = Math.max(1, Math.round((distKm / 30) * 60));
-    const newFare = fareService.calculateFare(
-      distKm,
-      durationMin,
-      booking.rideType as any
-    );
-
-    booking.drop = newDrop;
-    booking.distanceKm = Number(distKm.toFixed(2));
-    booking.durationText = `${durationMin} mins`;
-    booking.fareBreakdown = newFare;
-    booking.lastDropUpdateAt = new Date();
-    booking.logs.push({ ts: new Date(), text: "Destination updated by user" });
-
-    await booking.save();
-
-    return res.json({ ok: true, booking });
-  } catch (err) {
-    log("updateDestination error", err);
-    return res.status(500).json({ msg: "Server error" });
-  }
-};
-
-export const completeBooking = async (req: Request, res: Response) => {
-  try {
-    const { bookingId } = req.params;
-    const booking = await Booking.findById(bookingId);
-
-    if (!booking) return res.status(404).json({ msg: "Booking not found" });
-
-    booking.status = "completed";
-    booking.logs.push({ ts: new Date(), text: "Booking completed" });
-    await booking.save();
-
-    if (booking.driverId) {
-      const fareTotal = (booking.fareBreakdown as any)?.total || 0;
-
-      await Driver.findByIdAndUpdate(
-        booking.driverId,
-        {
-          $set: {
-            status: "available",
-            assignedBookingId: null,
-            lastAssignedAt: null,
-          },
-          $inc: {
-            totalEarnings: fareTotal,
-            totalRides: 1
-          }
-        }
-      );
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(400).json({ msg: "Missing userId" });
     }
 
-    return res.json({ ok: true, booking });
+    const bookings = await Booking.find({
+      userId: new mongoose.Types.ObjectId(userId)
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate("driverId", "name email vehicleType");
+
+    return res.json({ ok: true, bookings });
   } catch (err) {
-    log("completeBooking error", err);
-    return res.status(500).json({ msg: "Server error" });
-  }
-};
-
-export const cancelBooking = async (req: Request, res: Response) => {
-  try {
-    const { bookingId } = req.params;
-    const booking = await Booking.findById(bookingId);
-
-    if (!booking) return res.status(404).json({ msg: "Booking not found" });
-
-    booking.status = "cancelled";
-    booking.logs.push({ ts: new Date(), text: "Booking cancelled by user" });
-    await booking.save();
-
-    if (booking.driverId) {
-      await Driver.findByIdAndUpdate(booking.driverId, {
-        $set: {
-          status: "available",
-          assignedBookingId: null,
-          lastAssignedAt: null,
-        },
-      });
-    }
-
-    return res.json({ ok: true, booking });
-  } catch (err) {
-    log("cancelBooking error", err);
+    log("getBookingHistory error", err);
     return res.status(500).json({ msg: "Server error" });
   }
 };

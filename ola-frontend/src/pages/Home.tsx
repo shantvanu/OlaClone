@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate } from 'react-router-dom';
-import { Navigation, MapPin, X } from 'lucide-react';
+import { Navigation, MapPin, X, Clock, CheckCircle, Loader } from 'lucide-react';
 import L from 'leaflet';
 import { useDebounce } from 'use-debounce';
+import { getBookingHistory } from '../api/bookingApi';
 
 // Fix Leaflet marker icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -56,6 +57,10 @@ const Home: React.FC = () => {
   const [locationFetched, setLocationFetched] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
+  // Track if selections are from dropdown/GPS (not just typed)
+  const [pickupSelected, setPickupSelected] = useState(false);
+  const [destinationSelected, setDestinationSelected] = useState(false);
+
   // Destination suggestions
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -65,6 +70,10 @@ const Home: React.FC = () => {
   const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
   const [debouncedPickup] = useDebounce(manualPickup, 500);
+
+  // Order history state
+  const [bookingHistory, setBookingHistory] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
 
   const navigate = useNavigate();
 
@@ -119,6 +128,7 @@ const Home: React.FC = () => {
             lng: position.coords.longitude,
           });
           setLocationFetched(true);
+          setPickupSelected(true);
           setFetchingLocation(false);
           setUseManualLocation(false);
           alert('✅ Current location fetched successfully!');
@@ -149,34 +159,33 @@ const Home: React.FC = () => {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('[HOME] Search form submitted');
-    console.log('[HOME] Destination:', destination);
-    console.log('[HOME] Use manual location:', useManualLocation);
+
+    // Validate pickup location is selected
+    if (!pickupSelected) {
+      alert('❌ Please select pickup location from dropdown or fetch GPS');
+      return;
+    }
+
+    // Validate destination is selected
+    if (!destinationSelected) {
+      alert('❌ Please select destination from dropdown');
+      return;
+    }
 
     let pickupCoords = currentLocation;
 
-    // If using manual location, geocode it
+    // If using manual location, get it from the selected suggestion
     if (useManualLocation && manualPickup) {
-      console.log('[HOME] Geocoding manual pickup:', manualPickup);
+      console.log('[HOME] Using manual pickup:', manualPickup);
       const results = await searchLocation(manualPickup);
       if (results.length > 0) {
         pickupCoords = { lat: results[0].lat, lng: results[0].lng };
         console.log('[HOME] Manual pickup geocoded to:', pickupCoords);
-      } else {
-        alert('❌ Could not find pickup location. Please try a different address.');
-        console.error('[HOME] Manual pickup geocoding failed');
-        return;
       }
     }
 
     if (!pickupCoords) {
-      alert('❌ Please fetch your current location or enter it manually');
-      console.warn('[HOME] No pickup location available');
-      return;
-    }
-
-    if (!destination) {
-      alert('❌ Please enter a destination');
-      console.warn('[HOME] No destination entered');
+      alert('❌ Please fetch your current location');
       return;
     }
 
@@ -193,12 +202,14 @@ const Home: React.FC = () => {
   const selectSuggestion = (suggestion: any) => {
     console.log('[HOME] Suggestion selected:', suggestion.name);
     setDestination(suggestion.name);
+    setDestinationSelected(true);
     setShowSuggestions(false);
   };
 
   const selectPickupSuggestion = (suggestion: any) => {
     console.log('[HOME] Pickup suggestion selected:', suggestion.name);
     setManualPickup(suggestion.name);
+    setPickupSelected(true);
     setShowPickupSuggestions(false);
   };
 
@@ -209,8 +220,133 @@ const Home: React.FC = () => {
     setCurrentLocation({ lat: 19.0760, lng: 72.8777 });
   }, []);
 
+  // Fetch booking history
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoadingOrders(true);
+        const response = await getBookingHistory();
+        if (response.data.ok && response.data.bookings) {
+          setBookingHistory(response.data.bookings);
+          console.log('[HOME] Booking history fetched:', response.data.bookings);
+        }
+      } catch (error) {
+        console.error('[HOME] Error fetching booking history:', error);
+      } finally {
+        setLoadingOrders(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
   return (
-    <div className="h-[calc(100vh-64px)] relative">
+    <div className="h-[calc(100vh-64px)] relative flex">
+      {/* Sidebar - Orders */}
+      <div className="w-80 bg-secondary/95 backdrop-blur-xl border-r border-gray-700/50 overflow-y-auto">
+        <div className="p-4">
+          <h2 className="text-lg font-bold text-white mb-4">Your Orders</h2>
+          
+          {loadingOrders ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader size={24} className="text-accent animate-spin" />
+            </div>
+          ) : bookingHistory && bookingHistory.length > 0 ? (
+            <div className="space-y-3">
+              {/* Active Orders */}
+              {bookingHistory.some((b: any) => b.status === 'ACCEPTED' || b.status === 'PENDING') && (
+                <>
+                  <h3 className="text-sm font-semibold text-accent flex items-center gap-2 mt-4 mb-2">
+                    <Clock size={16} /> Active Rides
+                  </h3>
+                  {bookingHistory
+                    .filter((b: any) => b.status === 'ACCEPTED' || b.status === 'PENDING')
+                    .map((booking: any) => (
+                      <div
+                        key={booking._id}
+                        className="bg-primary/50 border border-accent/30 rounded-lg p-3 hover:border-accent/60 transition-colors"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-400">From</p>
+                            <p className="text-sm font-medium text-white truncate">{booking.pickupLocation}</p>
+                          </div>
+                          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded whitespace-nowrap ml-2">
+                            {booking.status}
+                          </span>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-400">To</p>
+                          <p className="text-sm font-medium text-white truncate">{booking.dropLocation}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <p className="text-gray-400">Distance</p>
+                            <p className="text-white font-medium">{booking.distanceKm} km</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Fare</p>
+                            <p className="text-white font-medium">₹{booking.fare}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </>
+              )}
+
+              {/* Past Orders */}
+              {bookingHistory.some((b: any) => b.status === 'COMPLETED') && (
+                <>
+                  <h3 className="text-sm font-semibold text-green-400 flex items-center gap-2 mt-4 mb-2">
+                    <CheckCircle size={16} /> Completed Rides
+                  </h3>
+                  {bookingHistory
+                    .filter((b: any) => b.status === 'COMPLETED')
+                    .slice(0, 5) // Show only last 5
+                    .map((booking: any) => (
+                      <div
+                        key={booking._id}
+                        className="bg-primary/50 border border-gray-700/50 rounded-lg p-3 hover:border-gray-600 transition-colors opacity-75"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-400">From</p>
+                            <p className="text-sm font-medium text-white truncate">{booking.pickupLocation}</p>
+                          </div>
+                          <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded whitespace-nowrap ml-2">
+                            ✓ Done
+                          </span>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-400">To</p>
+                          <p className="text-sm font-medium text-white truncate">{booking.dropLocation}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <p className="text-gray-400">Distance</p>
+                            <p className="text-white font-medium">{booking.distanceKm} km</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Fare</p>
+                            <p className="text-white font-medium">₹{booking.fare}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-400 text-sm">No orders yet</p>
+              <p className="text-gray-500 text-xs mt-2">Book your first ride to get started</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Map and Search Panel */}
+      <div className="flex-1 relative">
       {/* Map Background */}
       <div className="absolute inset-0 z-0">
         {currentLocation ? (
@@ -370,12 +506,14 @@ const Home: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full bg-accent text-black font-bold py-3 rounded-lg hover:opacity-90 transition-all shadow-lg shadow-accent/20"
+              disabled={!pickupSelected || !destinationSelected}
+              className="w-full bg-accent text-black font-bold py-3 rounded-lg hover:opacity-90 transition-all shadow-lg shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Search Ride
+              {!pickupSelected ? '📍 Select Pickup Location' : !destinationSelected ? '🎯 Select Destination' : 'Search Ride'}
             </button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   );

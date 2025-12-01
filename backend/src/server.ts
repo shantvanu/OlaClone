@@ -16,20 +16,6 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       log(`Server running at http://localhost:${PORT}`);
-
-      /** ---------------------------------------------
-       *  Load Workers (Optimized for assignment demo)
-       *  - Scheduler: Handles future scheduled bookings
-       *  - Assignment: Auto-frees stale driver assignments
-       * --------------------------------------------- */
-      try {
-        // require dynamically to avoid TS/ESM issues
-        require("./workers/scheduler.worker");
-        require("./workers/assignment.worker");
-        log("✓ Background workers started");
-      } catch (e) {
-        console.warn("⚠ Worker start failed. Run workers separately if needed.", e);
-      }
     });
 
   } catch (error) {

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../redux/userSlice';
-import { login } from '../api/authApi';
+import { login, loginDriver } from '../api/authApi';
 
 const Login: React.FC = () => {
+    const [isDriver, setIsDriver] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -38,13 +39,16 @@ const Login: React.FC = () => {
             return;
         }
 
-        console.log('[LOGIN] Form submitted with email:', formData.email);
+        console.log('[LOGIN] Form submitted with email:', formData.email, 'isDriver:', isDriver);
         setError('');
         setLoading(true);
 
         try {
             console.log('[LOGIN] Calling login API...');
-            const response = await login(formData.email, formData.password);
+            const response = isDriver
+                ? await loginDriver(formData.email, formData.password)
+                : await login(formData.email, formData.password);
+            
             console.log('[LOGIN] API Response:', response.data);
 
             if (response.data.ok && response.data.token) {
@@ -83,6 +87,29 @@ const Login: React.FC = () => {
         <div className="flex justify-center items-center min-h-[80vh] py-10">
             <div className="bg-secondary p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-800">
                 <h2 className="text-3xl font-bold mb-6 text-center text-white">Welcome Back</h2>
+
+                <div className="flex bg-primary p-1 rounded-lg mb-6 border border-gray-700">
+                    <button
+                        type="button"
+                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${!isDriver ? 'bg-accent text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => {
+                            setIsDriver(false);
+                            setError('');
+                        }}
+                    >
+                        Passenger
+                    </button>
+                    <button
+                        type="button"
+                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${isDriver ? 'bg-accent text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => {
+                            setIsDriver(true);
+                            setError('');
+                        }}
+                    >
+                        Driver
+                    </button>
+                </div>
 
                 {error && (
                     <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg mb-4 text-sm">
@@ -138,3 +165,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+

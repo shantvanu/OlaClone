@@ -2,8 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../redux/userSlice';
-import { register, login } from '../api/authApi';
-import { registerDriver } from '../api/driverApi';
+import { register, registerDriver, login, loginDriver } from '../api/authApi';
+
+interface ApiError {
+  response?: {
+    data?: {
+      msg?: string;
+    };
+  };
+  message?: string;
+}
 
 const Register: React.FC = () => {
     const [isDriver, setIsDriver] = useState(false);
@@ -11,8 +19,7 @@ const Register: React.FC = () => {
         name: '',
         email: '',
         password: '',
-        phone: '',
-        vehicleType: 'car'
+        vehicleType: 'CAR'
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,12 +44,6 @@ const Register: React.FC = () => {
             setError('Password must be at least 6 characters long');
             return false;
         }
-        if (isDriver) {
-            if (!formData.phone || !/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-                setError('Please enter a valid 10-digit phone number');
-                return false;
-            }
-        }
         return true;
     };
 
@@ -60,84 +61,62 @@ const Register: React.FC = () => {
 
         try {
             if (isDriver) {
-                console.log('[REGISTER] Starting driver registration process...');
+                console.log('[REGISTER] Starting driver registration...');
 
-                // Step 1: Register user
-                console.log('[REGISTER] Step 1: Registering user account...');
-                const userResponse = await register(formData.name, formData.email, formData.password);
-                console.log('[REGISTER] User registration response:', userResponse.data);
+                // Register driver
+                const driverResponse = await registerDriver(
+                    formData.name,
+                    formData.email,
+                    formData.password,
+                    formData.vehicleType
+                );
+                console.log('[REGISTER] Driver registration response:', driverResponse.data);
 
-                if (!userResponse.data.ok) {
-                    throw new Error('User registration failed');
+                if (!driverResponse.data.ok) {
+                    throw new Error('Driver registration failed');
                 }
 
-                // Step 2: Login to get token
-                console.log('[REGISTER] Step 2: Logging in to get token...');
-                const loginResponse = await login(formData.email, formData.password);
-                console.log('[REGISTER] Login response:', loginResponse.data);
+                // Login as driver
+                const loginResponse = await loginDriver(formData.email, formData.password);
+                console.log('[REGISTER] Driver login response:', loginResponse.data);
 
                 const token = loginResponse.data.token;
                 localStorage.setItem('token', token);
-                console.log('[REGISTER] Token stored in localStorage');
 
-                // Step 3: Register driver
-                console.log('[REGISTER] Step 3: Creating driver profile...');
-                const driverResponse = await registerDriver({
-                    name: formData.name,
-                    phone: formData.phone,
-                    vehicleType: formData.vehicleType
-                });
-                console.log('[REGISTER] Driver registration response:', driverResponse.data);
+                dispatch(setUser({
+                    token,
+                    user: loginResponse.data.user
+                }));
 
-                if (driverResponse.data.ok) {
-                    const driverId = driverResponse.data.driver._id;
-                    console.log('[REGISTER] Driver created successfully! Driver ID:', driverId);
-
-                    // Dispatch user with driver role
-                    dispatch(setUser({
-                        token,
-                        user: {
-                            ...loginResponse.data.user,
-                            role: 'driver',
-                            driverId,
-                            vehicleType: formData.vehicleType,
-                            phone: formData.phone
-                        }
-                    }));
-
-                    alert(`🚗 Driver Registration Successful!\nWelcome ${formData.name}!\nDriver ID: ${driverId}`);
-                    console.log('[REGISTER] Navigating to driver dashboard...');
-                    navigate('/driver');
-                }
+                alert(`🚗 Driver Registration Successful!\nWelcome ${formData.name}!`);
+                console.log('[REGISTER] Navigating to driver dashboard...');
+                navigate('/driver');
             } else {
                 console.log('[REGISTER] Starting user registration...');
 
-                // Regular user registration
-                const response = await register(formData.name, formData.email, formData.password);
-                console.log('[REGISTER] User registration response:', response.data);
+                // Register user
+                const registerResponse = await register(formData.name, formData.email, formData.password);
+                console.log('[REGISTER] User registration response:', registerResponse.data);
 
-                if (response.data.ok) {
-                    console.log('[REGISTER] User registered successfully, auto-logging in...');
-
-                    // Auto-login after registration
-                    const loginResponse = await login(formData.email, formData.password);
-                    console.log('[REGISTER] Auto-login response:', loginResponse.data);
-
-                    dispatch(setUser({ token: loginResponse.data.token, user: loginResponse.data.user }));
-
-                    alert(`✅ Registration Successful!\nWelcome ${formData.name}!`);
-                    console.log('[REGISTER] Navigating to home page...');
-                    navigate('/');
-                } else {
-                    console.error('[REGISTER] Registration failed: No success flag');
-                    setError('Registration failed');
+                if (!registerResponse.data.ok) {
+                    throw new Error('User registration failed');
                 }
-            }
 
-        } catch (err: any) {
+                // Auto-login
+                const loginResponse = await login(formData.email, formData.password);
+                console.log('[REGISTER] User login response:', loginResponse.data);
+
+                dispatch(setUser({ token: loginResponse.data.token, user: loginResponse.data.user }));
+
+                alert(`✅ Registration Successful!\nWelcome ${formData.name}!`);
+                console.log('[REGISTER] Navigating to home page...');
+                navigate('/');
+            }
+        } catch (err: unknown) {
             console.error('[REGISTER] Registration error:', err);
-            console.error('[REGISTER] Error response:', err.response?.data);
-            const errorMsg = err.response?.data?.msg || err.message || 'Registration failed';
+            const apiErr = err as ApiError;
+            console.error('[REGISTER] Error response:', apiErr.response?.data);
+            const errorMsg = apiErr.response?.data?.msg || apiErr.message || 'Registration failed';
             setError(errorMsg);
             alert(`❌ Registration Failed: ${errorMsg}`);
         } finally {
@@ -157,6 +136,7 @@ const Register: React.FC = () => {
                         className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${!isDriver ? 'bg-accent text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
                         onClick={() => {
                             setIsDriver(false);
+                            setError('');
                             console.log('[REGISTER] Switched to Passenger mode');
                         }}
                     >
@@ -167,6 +147,7 @@ const Register: React.FC = () => {
                         className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${isDriver ? 'bg-accent text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
                         onClick={() => {
                             setIsDriver(true);
+                            setError('');
                             console.log('[REGISTER] Switched to Driver mode');
                         }}
                     >
@@ -221,34 +202,20 @@ const Register: React.FC = () => {
                     </div>
 
                     {isDriver && (
-                        <>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Phone</label>
-                                <input
-                                    name="phone"
-                                    type="tel"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className="w-full bg-primary border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
-                                    placeholder="+1234567890"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Vehicle Type</label>
-                                <select
-                                    name="vehicleType"
-                                    value={formData.vehicleType}
-                                    onChange={handleChange}
-                                    className="w-full bg-primary border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
-                                >
-                                    <option value="mini">Mini</option>
-                                    <option value="car">Car</option>
-                                    <option value="bike">Bike</option>
-                                    <option value="auto">Auto</option>
-                                </select>
-                            </div>
-                        </>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">Vehicle Type</label>
+                            <select
+                                name="vehicleType"
+                                value={formData.vehicleType}
+                                onChange={handleChange}
+                                className="w-full bg-primary border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent transition-colors"
+                                required
+                            >
+                                <option value="BIKE">Bike</option>
+                                <option value="AUTO">Auto</option>
+                                <option value="CAR">Car</option>
+                            </select>
+                        </div>
                     )}
 
                     <button
@@ -256,14 +223,14 @@ const Register: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-accent text-black font-bold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 mt-4"
                     >
-                        {loading ? 'Creating Account...' : 'Sign Up'}
+                        {loading ? 'Creating Account...' : 'Create Account'}
                     </button>
                 </form>
 
                 <p className="mt-6 text-center text-gray-400 text-sm">
                     Already have an account?{' '}
                     <Link to="/login" className="text-accent hover:underline">
-                        Login
+                        Sign In
                     </Link>
                 </p>
             </div>
