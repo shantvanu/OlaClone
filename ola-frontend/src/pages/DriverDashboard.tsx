@@ -71,7 +71,7 @@ const DriverDashboard: React.FC = () => {
                                 const nearbyRes = await getNearbyRequests(lat, lng, vehicleType);
                                 console.log('[DRIVER_DASHBOARD] Nearby requests response:', nearbyRes.data);
 
-                                const requestsList = nearbyRes.data.drivers || [];
+                                const requestsList = nearbyRes.data.requests || [];
                                 console.log(`[DRIVER_DASHBOARD] Found ${requestsList.length} nearby requests`);
                                 setRequests(requestsList);
                             } catch (err) {
