@@ -11,10 +11,10 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
@@ -55,12 +55,17 @@ const Home: React.FC = () => {
   const [useManualLocation, setUseManualLocation] = useState(false);
   const [locationFetched, setLocationFetched] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
-  
+
   // Destination suggestions
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [debouncedDestination] = useDebounce(destination, 500);
-  
+
+  // Pickup suggestions
+  const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const [debouncedPickup] = useDebounce(manualPickup, 500);
+
   const navigate = useNavigate();
 
   // Fetch suggestions when destination changes
@@ -79,6 +84,23 @@ const Home: React.FC = () => {
 
     fetchSuggestions();
   }, [debouncedDestination]);
+
+  // Fetch suggestions when pickup changes
+  useEffect(() => {
+    const fetchPickupSuggestions = async () => {
+      if (debouncedPickup.length > 2) {
+        console.log('[HOME] Fetching pickup suggestions for:', debouncedPickup);
+        const results = await searchLocation(debouncedPickup);
+        setPickupSuggestions(results);
+        setShowPickupSuggestions(true);
+      } else {
+        setPickupSuggestions([]);
+        setShowPickupSuggestions(false);
+      }
+    };
+
+    fetchPickupSuggestions();
+  }, [debouncedPickup]);
 
   const handleFetchLocation = () => {
     console.log('[HOME] Fetch Current Location button clicked');
@@ -106,12 +128,12 @@ const Home: React.FC = () => {
           console.error('[HOME] Error code:', error.code);
           console.error('[HOME] Error message:', error.message);
           setFetchingLocation(false);
-          
+
           let errorMsg = 'Failed to fetch location';
           if (error.code === 1) errorMsg = 'Location permission denied';
           else if (error.code === 2) errorMsg = 'Location unavailable';
           else if (error.code === 3) errorMsg = 'Location request timeout';
-          
+
           alert(`❌ ${errorMsg}\nPlease enter your location manually.`);
           setUseManualLocation(true);
         }
@@ -159,7 +181,7 @@ const Home: React.FC = () => {
     }
 
     console.log('[HOME] Navigating to booking page with:', { pickupCoords, destination });
-    
+
     navigate('/booking', {
       state: {
         pickup: pickupCoords,
@@ -174,6 +196,12 @@ const Home: React.FC = () => {
     setShowSuggestions(false);
   };
 
+  const selectPickupSuggestion = (suggestion: any) => {
+    console.log('[HOME] Pickup suggestion selected:', suggestion.name);
+    setManualPickup(suggestion.name);
+    setShowPickupSuggestions(false);
+  };
+
   // Initialize with default location
   useEffect(() => {
     console.log('[HOME] Component mounted');
@@ -186,9 +214,9 @@ const Home: React.FC = () => {
       {/* Map Background */}
       <div className="absolute inset-0 z-0">
         {currentLocation ? (
-          <MapContainer 
-            center={[currentLocation.lat, currentLocation.lng]} 
-            zoom={15} 
+          <MapContainer
+            center={[currentLocation.lat, currentLocation.lng]}
+            zoom={15}
             style={{ height: '100%', width: '100%' }}
             zoomControl={false}
           >
@@ -221,7 +249,7 @@ const Home: React.FC = () => {
                 <Navigation size={20} className="text-accent" />
                 <span className="text-sm font-medium text-gray-300">Pickup Location</span>
               </div>
-              
+
               {!useManualLocation ? (
                 <div className="space-y-2">
                   <input
@@ -250,12 +278,13 @@ const Home: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <div className="relative">
                     <input
                       type="text"
                       value={manualPickup}
                       onChange={(e) => setManualPickup(e.target.value)}
+                      onFocus={() => pickupSuggestions.length > 0 && setShowPickupSuggestions(true)}
                       placeholder="Enter pickup address"
                       className="w-full bg-primary border border-gray-600 rounded-lg px-4 py-3 pr-10 text-white focus:outline-none focus:border-accent placeholder-gray-500"
                       required
@@ -272,6 +301,26 @@ const Home: React.FC = () => {
                       <X size={18} />
                     </button>
                   </div>
+
+                  {/* Pickup Suggestions Dropdown */}
+                  {showPickupSuggestions && pickupSuggestions.length > 0 && (
+                    <div className="absolute top-full mt-1 w-full bg-primary border border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-30">
+                      {pickupSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => selectPickupSuggestion(suggestion)}
+                          className="w-full text-left px-4 py-3 hover:bg-secondary transition-colors border-b border-gray-800 last:border-0"
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin size={16} className="text-accent mt-1 flex-shrink-0" />
+                            <span className="text-white text-sm">{suggestion.name}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleFetchLocation}
@@ -298,7 +347,7 @@ const Home: React.FC = () => {
                 className="w-full bg-primary border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent placeholder-gray-500"
                 required
               />
-              
+
               {/* Suggestions Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute top-full mt-2 w-full bg-primary border border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-20">
