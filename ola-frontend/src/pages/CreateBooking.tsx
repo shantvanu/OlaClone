@@ -116,15 +116,17 @@ const CreateBooking: React.FC = () => {
                 const amount = booking.fareBreakdown?.total || rideOptions.find(r => r.type === selectedRide)?.price || 0;
                 console.log('[CREATE_BOOKING] Booking created successfully! ID:', bookingId, 'Amount:', amount);
 
-                alert(`✅ Booking Confirmed!\n\nBooking ID: ${bookingId}\nRide Type: ${selectedRide}\nEstimated Fare: ₹${amount}\n\nProceeding to payment...`);
+                alert(`✅ Booking Confirmed!
 
-                // Navigate to payment page with bookingId & amount
-                navigate('/payment', {
-                    state: {
-                        bookingId,
-                        amount
-                    }
-                });
+Booking ID: ${bookingId}
+Ride Type: ${selectedRide.toUpperCase()}
+Estimated Fare: ₹${amount}
+
+Your ride request has been sent to nearby drivers.
+You will be notified when a driver accepts your request.`);
+
+                // Navigate back to home
+                navigate('/');
             } else {
                 throw new Error('Booking creation failed - no success flag');
             }
@@ -136,7 +138,11 @@ const CreateBooking: React.FC = () => {
             console.error('[CREATE_BOOKING] Error message:', errorMessage);
 
             setError(errorMessage);
-            alert(`❌ Booking Failed!\n\nReason: ${errorMessage}\n\nPlease try again or contact support.`);
+            alert(`❌ Booking Failed!
+
+Reason: ${errorMessage}
+
+Please try again or contact support.`);
         } finally {
             setLoading(false);
             console.log('[CREATE_BOOKING] Booking process completed');
@@ -199,8 +205,8 @@ const CreateBooking: React.FC = () => {
                                 console.log('[CREATE_BOOKING] Ride type selected:', ride.type);
                             }}
                             className={`w-full p-6 rounded-xl border-2 transition-all ${selectedRide === ride.type
-                                    ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20'
-                                    : 'border-gray-700 bg-secondary hover:border-gray-600'
+                                ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20'
+                                : 'border-gray-700 bg-secondary hover:border-gray-600'
                                 }`}
                         >
                             <div className="flex items-center justify-between">

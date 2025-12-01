@@ -36,8 +36,16 @@ const Login: React.FC = () => {
 
                 // Success notification
                 alert(`✅ Welcome back, ${response.data.user.name}!`);
-                console.log('[LOGIN] Redirecting to home page...');
-                navigate('/');
+                console.log('[LOGIN] Redirecting based on user role...');
+
+                // Redirect based on role
+                if (response.data.user.role === 'driver') {
+                    console.log('[LOGIN] User is a driver, redirecting to /driver');
+                    navigate('/driver');
+                } else {
+                    console.log('[LOGIN] User is a regular user, redirecting to /');
+                    navigate('/');
+                }
             } else {
                 console.error('[LOGIN] Login failed: No token in response');
                 setError('Login failed. Please try again.');

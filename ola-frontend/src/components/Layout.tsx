@@ -26,14 +26,23 @@ const Layout: React.FC = () => {
                 <div className="flex items-center gap-6">
                     {user ? (
                         <>
-                            <Link to="/booking" className="hover:text-accent transition-colors">Book a Ride</Link>
+                            {/* Show "Book a Ride" only to regular users (not drivers) */}
+                            {user.role !== 'driver' && (
+                                <Link to="/booking" className="hover:text-accent transition-colors">Book a Ride</Link>
+                            )}
+
+                            {/* Show "Driver Dashboard" only to drivers */}
                             {user.role === 'driver' && (
                                 <Link to="/driver" className="hover:text-accent transition-colors">Driver Dashboard</Link>
                             )}
+
                             <div className="flex items-center gap-4 ml-4">
                                 <div className="flex items-center gap-2 text-sm text-text-muted">
                                     <UserIcon size={16} />
                                     <span>{user.name}</span>
+                                    {user.role === 'driver' && (
+                                        <span className="ml-2 px-2 py-0.5 bg-accent/20 text-accent text-xs rounded-full font-semibold">Driver</span>
+                                    )}
                                 </div>
                                 <button
                                     onClick={handleLogout}

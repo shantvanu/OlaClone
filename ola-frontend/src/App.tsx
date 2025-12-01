@@ -6,17 +6,52 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import CreateBooking from './pages/CreateBooking';
 import DriverDashboard from './pages/DriverDashboard';
-import PaymentPage from './pages/PaymentPage';
 import BookingStatus from './pages/BookingStatus';
 import { useSelector } from 'react-redux';
 import type { RootState } from './redux/store';
 
-// Protected Route Wrapper
-const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-  const { token } = useSelector((state: RootState) => state.user);
+// Protected Route for authenticated users only (non-drivers)
+const UserRoute = ({ children }: { children: React.ReactElement }) => {
+  const { token, user } = useSelector((state: RootState) => state.user);
+
   if (!token) {
     return <Navigate to="/login" replace />;
   }
+
+  if (user?.role === 'driver') {
+    return <Navigate to="/driver" replace />;
+  }
+
+  return children;
+};
+
+// Protected Route for drivers only
+const DriverRoute = ({ children }: { children: React.ReactElement }) => {
+  const { token, user } = useSelector((state: RootState) => state.user);
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role !== 'driver') {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+};
+
+// Public routes (login/register) - redirect if already authenticated
+const PublicOnlyRoute = ({ children }: { children: React.ReactElement }) => {
+  const { token, user } = useSelector((state: RootState) => state.user);
+
+  if (token && user) {
+    // Redirect based on role
+    if (user.role === 'driver') {
+      return <Navigate to="/driver" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 };
 
@@ -25,32 +60,43 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="login" element={<Login />} />
-          <Route path="register" element={<Register />} />
-
-          <Route path="booking" element={
-            <ProtectedRoute>
-              <CreateBooking />
-            </ProtectedRoute>
+          {/* Home - protected for users only */}
+          <Route index element={
+            <UserRoute>
+              <Home />
+            </UserRoute>
           } />
 
-          <Route path="driver" element={
-            <ProtectedRoute>
-              <DriverDashboard />
-            </ProtectedRoute>
+          {/* Public routes */}
+          <Route path="login" element={
+            <PublicOnlyRoute>
+              <Login />
+            </PublicOnlyRoute>
+          } />
+          <Route path="register" element={
+            <PublicOnlyRoute>
+              <Register />
+            </PublicOnlyRoute>
+          } />
+
+          {/* User-only routes */}
+          <Route path="booking" element={
+            <UserRoute>
+              <CreateBooking />
+            </UserRoute>
           } />
 
           <Route path="bookings" element={
-            <ProtectedRoute>
+            <UserRoute>
               <BookingStatus />
-            </ProtectedRoute>
+            </UserRoute>
           } />
 
-          <Route path="payment" element={
-            <ProtectedRoute>
-              <PaymentPage />
-            </ProtectedRoute>
+          {/* Driver-only routes */}
+          <Route path="driver" element={
+            <DriverRoute>
+              <DriverDashboard />
+            </DriverRoute>
           } />
         </Route>
       </Routes>

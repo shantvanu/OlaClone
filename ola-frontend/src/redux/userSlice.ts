@@ -6,9 +6,19 @@ interface UserState {
   user: any;
 }
 
+// Helper to get stored user data
+const getStoredUser = () => {
+  try {
+    const userData = localStorage.getItem("user");
+    return userData ? JSON.parse(userData) : null;
+  } catch {
+    return null;
+  }
+};
+
 const initialState: UserState = {
   token: localStorage.getItem("token"),
-  user: null,
+  user: getStoredUser(),
 };
 
 const userSlice = createSlice({
@@ -19,11 +29,13 @@ const userSlice = createSlice({
       state.token = action.payload.token;
       state.user = action.payload.user;
       localStorage.setItem("token", action.payload.token);
+      localStorage.setItem("user", JSON.stringify(action.payload.user));
     },
     logout(state) {
       state.user = null;
       state.token = null;
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
     },
   },
 });
