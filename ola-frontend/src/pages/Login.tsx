@@ -19,8 +19,25 @@ const Login: React.FC = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const validateForm = () => {
+        if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+            setError('Please enter a valid email address');
+            return false;
+        }
+        if (!formData.password || formData.password.length < 6) {
+            setError('Password must be at least 6 characters long');
+            return false;
+        }
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!validateForm()) {
+            return;
+        }
+
         console.log('[LOGIN] Form submitted with email:', formData.email);
         setError('');
         setLoading(true);

@@ -24,8 +24,35 @@ const Register: React.FC = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const validateForm = () => {
+        if (!formData.name || formData.name.length < 2) {
+            setError('Name must be at least 2 characters long');
+            return false;
+        }
+        if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+            setError('Please enter a valid email address');
+            return false;
+        }
+        if (!formData.password || formData.password.length < 6) {
+            setError('Password must be at least 6 characters long');
+            return false;
+        }
+        if (isDriver) {
+            if (!formData.phone || !/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+                setError('Please enter a valid 10-digit phone number');
+                return false;
+            }
+        }
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!validateForm()) {
+            return;
+        }
+
         console.log('[REGISTER] Form submitted. Is Driver:', isDriver);
         console.log('[REGISTER] Form data:', { ...formData, password: '***' });
         setError('');

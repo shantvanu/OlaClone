@@ -239,15 +239,15 @@ Please try again or contact support.`);
                 <div className="bg-secondary p-6 rounded-xl mb-6">
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-gray-400">Selected Ride</span>
-                        <span className="text-white font-bold">{rideOptions.find(r => r.type === selectedRide)?.label}</span>
+                        <span className="text-white font-bold">{rideOptions.find(r => r.type === selectedRide)?.label || 'Car'}</span>
                     </div>
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-gray-400">Estimated Fare</span>
-                        <span className="text-accent font-bold text-xl">₹{rideOptions.find(r => r.type === selectedRide)?.price}</span>
+                        <span className="text-accent font-bold text-xl">₹{rideOptions.find(r => r.type === selectedRide)?.price || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-gray-400">Estimated Time</span>
-                        <span className="text-white">{rideOptions.find(r => r.type === selectedRide)?.time}</span>
+                        <span className="text-white">{rideOptions.find(r => r.type === selectedRide)?.time || '--'}</span>
                     </div>
                 </div>
 

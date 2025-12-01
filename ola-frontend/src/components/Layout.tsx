@@ -16,7 +16,7 @@ const Layout: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-primary text-text-main">
+        <div className="h-screen overflow-hidden flex flex-col bg-primary text-text-main">
             <nav className="bg-secondary border-b border-gray-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
                 <div
                     onClick={() => {
